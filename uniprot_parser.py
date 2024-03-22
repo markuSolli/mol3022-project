@@ -54,7 +54,7 @@ def collect_to_file(URL: str, n: int, filepath: str):
 def get_uniprot_data():
     URL: str = "https://rest.uniprot.org/uniprotkb/search?format=json&query=%28*%29+AND+%28reviewed%3Atrue%29+AND+%28proteins_with%3A1%29&size=500&sort=id+asc"
 
-    URL = collect_to_file(URL, 1, 'data/training.csv')
+    URL = collect_to_file(URL, 2, 'data/training.csv')
     URL = collect_to_file(URL, 1, 'data/test.csv')    
 
 if __name__ == "__main__":
