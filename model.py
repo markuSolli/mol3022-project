@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.nn.modules import Module, CrossEntropyLoss
 from torch.optim import Optimizer, SGD
-from torch.optim.lr_scheduler import LinearLR
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
@@ -16,9 +16,9 @@ from protein_structure_dataset import ProteinStructureDataset
 SPAN = 6
 M = SPAN * 2 + 1
 
-LEARNING_RATE: float = 0.1
+LEARNING_RATE: float = 1e-4
 BATCH_SIZE: int = 64
-EPOCHS: int = 10
+EPOCHS: int = 6
 
 device = (
     "cuda"
@@ -88,7 +88,7 @@ def train_model():
     train_dataloader: DataLoader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True)
 
     optimizer: SGD = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
-    scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.01, total_iters=(EPOCHS - 1))
+    scheduler = StepLR(optimizer, step_size=3, gamma=0.1)
 
     loss_list: list[float] = []
     loss_x: list[int] = []
@@ -98,7 +98,7 @@ def train_model():
 
     for t in range(EPOCHS):
         lr = optimizer.param_groups[0]["lr"]
-        print(f"Epoch {t+1}: lr {lr:.4f}\n-------------------------------")
+        print(f"Epoch {t+1}: lr {lr:.6f}\n-------------------------------")
         i = train_loop(train_dataloader, model, loss_fn, optimizer, loss_list, loss_x, i)
         test_loop(test_dataloader, model, accuracy_list, accuracy_x, i - 1)
 
@@ -122,7 +122,7 @@ def train_model():
     ax2.plot(accuracy_x, accuracy_list, color=color)
     ax2.tick_params(axis='y', labelcolor=color)
 
-    plot_text = 'LR: %.4f-%.4f\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20, 20)\nLeakReLu\nLinear(20,10)\nLeakyReLu\nLinear(10,3)'%(LEARNING_RATE, lr, SPAN)
+    plot_text = 'LR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20, 3)'%(LEARNING_RATE, lr, SPAN)
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
     ax2.text(1.15, 0.95, plot_text, transform=ax2.transAxes, fontsize=11, verticalalignment='top', bbox=props)
     plt.tight_layout()
