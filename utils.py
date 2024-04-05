@@ -1,4 +1,5 @@
 import torch
+from torch import Tensor
 import numpy as np
 
 residue_dict: dict[str, int] = {
@@ -30,22 +31,36 @@ structure_dict: dict[str, int] = {
     'B': 2
 }
 
-def transform_sequence(sequences, span: int):
+def transform_sequence(sequence: str, span: int) -> Tensor:
+    t_sequences = []
+    m = span * 2 + 1
+
+    sequence_matrix = np.zeros((len(sequence) + span * 2, 20), dtype=np.float32)
+
+    for i in range(len(sequence)):
+        sequence_matrix[i + span][residue_dict[sequence[i]]] = 1.0
+        
+    for i in range(len(sequence)):
+        t_sequences.append(sequence_matrix[i:i+m])
+    
+    return torch.from_numpy(np.array(t_sequences))
+
+def transform_sequences(sequences, span: int):
     t_sequences = []
     m = span * 2 + 1
 
     for sequence in sequences:
         sequence_matrix = np.zeros((len(sequence) + span * 2, 20), dtype=np.float32)
 
-        for i in range(span, len(sequence) - span):
-            sequence_matrix[i][residue_dict[sequence[i]]] = 1.0
+        for i in range(len(sequence)):
+            sequence_matrix[i + span][residue_dict[sequence[i]]] = 1.0
         
-        for i in range(len(sequence_matrix) - m + 1):
+        for i in range(len(sequence)):
             t_sequences.append(sequence_matrix[i:i+m])
         
     return torch.from_numpy(np.array(t_sequences))
 
-def transform_structure(structures):
+def transform_structures(structures):
     t_structures = []
 
     for structure in structures:

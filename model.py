@@ -1,4 +1,6 @@
 import sys
+import os
+from dotenv import load_dotenv
 
 import torch
 from torch import nn
@@ -13,12 +15,13 @@ from datetime import datetime
 from neural_network import NeuralNetwork
 from protein_structure_dataset import ProteinStructureDataset
 
-SPAN = 6
-M = SPAN * 2 + 1
+load_dotenv()
+SPAN: int = int(os.getenv('SPAN'))
+BATCH_SIZE: int = int(os.getenv('BATCH_SIZE'))
+M: int = SPAN * 2 + 1
 
 LEARNING_RATE: float = 1e-4
-BATCH_SIZE: int = 64
-EPOCHS: int = 6
+EPOCHS: int = 3
 
 device = (
     "cuda"
@@ -34,7 +37,8 @@ model: NeuralNetwork = NeuralNetwork(M).to(device)
 test_data = ProteinStructureDataset('data/test.csv', SPAN, device)
 test_dataloader: DataLoader = DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=True)
 
-loss_fn: CrossEntropyLoss = nn.CrossEntropyLoss()
+WEIGHT = torch.tensor([0.522, 1.477, 2.450])
+loss_fn: CrossEntropyLoss = nn.CrossEntropyLoss(weight=WEIGHT)
 
 def train_loop(dataloader: DataLoader, model: NeuralNetwork, loss_fn: Module, optimizer: Optimizer, loss_list: list[float], loss_x: list[int], iteration: int):
     size = len(dataloader)
@@ -50,7 +54,7 @@ def train_loop(dataloader: DataLoader, model: NeuralNetwork, loss_fn: Module, op
         optimizer.step()
         optimizer.zero_grad()
         
-        if batch % 50 == 0:
+        if batch % 40 == 0:
             loss_list.append(loss.item())
             loss_x.append(iteration)
             iteration += 1
@@ -70,7 +74,7 @@ def test_loop(dataloader: DataLoader, model: NeuralNetwork, accuracy_list: list[
         for sequence, structure in dataloader:
             pred = model.classify(sequence.view(-1, 20 * model.m))
 
-            correct += (structure[0][pred.argmax(1)] == 1).type(torch.float).sum().item()
+            correct += (structure.argmax(1) == pred.argmax(1)).type(torch.float).sum().item()
 
     correct /= size
     print(f"Accuracy: {(100*correct):>0.1f}% \n")
@@ -88,13 +92,15 @@ def train_model():
     train_dataloader: DataLoader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True)
 
     optimizer: SGD = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
-    scheduler = StepLR(optimizer, step_size=3, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=1, gamma=0.1)
 
     loss_list: list[float] = []
     loss_x: list[int] = []
     accuracy_list: list[float] = []
     accuracy_x: list[int] = []
     i: int = 0
+
+    test_loop(test_dataloader, model, accuracy_list, accuracy_x, 0)
 
     for t in range(EPOCHS):
         lr = optimizer.param_groups[0]["lr"]
@@ -111,6 +117,7 @@ def train_model():
     color = 'tab:blue'
     ax1.set_xlabel('iteration')
     ax1.set_ylabel('loss', color=color)
+    ax1.set_ylim([0, 1.6])
     ax1.plot(loss_x, loss_list, '.', color=color, alpha=0.3)
     ax1.tick_params(axis='y', labelcolor=color)
 
@@ -122,7 +129,7 @@ def train_model():
     ax2.plot(accuracy_x, accuracy_list, color=color)
     ax2.tick_params(axis='y', labelcolor=color)
 
-    plot_text = 'LR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20, 3)'%(LEARNING_RATE, lr, SPAN)
+    plot_text = 'Accuracy: %.1f%%\nLR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20m, 10m)\nLeakyReLu()\nLinear(10m, m)\nLeakyReLu()\nLinear(m, 3)'%(accuracy_list[-1], LEARNING_RATE, lr, SPAN)
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
     ax2.text(1.15, 0.95, plot_text, transform=ax2.transAxes, fontsize=11, verticalalignment='top', bbox=props)
     plt.tight_layout()
@@ -130,7 +137,6 @@ def train_model():
     now = datetime.now()
     filename = "plots/plot_" + now.strftime('%Y%m%d_%H%M') + ".png"
     plt.savefig(filename)
-    print(filename)
     plt.show()
 
 def main():
