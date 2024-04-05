@@ -8,11 +8,7 @@ class NeuralNetwork(Module):
         self.flatten = nn.Flatten()
         self.softmax = nn.Softmax(1)
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(20 * self.m, 20 * self.m),
-            nn.LeakyReLU(),
-            nn.Linear(20 * self.m, 10 * self.m),
-            nn.LeakyReLU(),
-            nn.Linear(10 * self.m, 3),
+            nn.Linear(20 * self.m, 3),
         )
 
     def forward(self, x):
