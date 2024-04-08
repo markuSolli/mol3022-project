@@ -10,7 +10,15 @@ SPAN: int = int(os.getenv('SPAN'))
 BATCH_SIZE: int = int(os.getenv('BATCH_SIZE'))
 M: int = SPAN * 2 + 1
 
-def analyze_dataset(csv, figname):
+def analyze_dataset(csv: str, figname: str) -> None:
+    '''
+    Validates the model against the given csv file and analyzes the result.
+    A confusion matrix is plotted and saved, as well as some accuracy measures.
+
+    Parameters:
+        csv (str): The filepath of the csv file to analyze.
+        figname (str): The filepath of the plot to store.
+    '''
     data = ProteinStructureDataset(csv, SPAN, "cpu")
     dataloader: DataLoader = DataLoader(data, batch_size=BATCH_SIZE, shuffle=True)
 

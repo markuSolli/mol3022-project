@@ -32,6 +32,18 @@ structure_dict: dict[str, int] = {
 }
 
 def transform_sequence(sequence: str, span: int) -> Tensor:
+    '''
+    Takes a single sequence string and transforms it to a Tensor, ready for use in the model.
+    Since protein sequences are of varying length, it chops the string into pieces of (2 * span + 1) length.
+    To make endpoints valid, it applies zero padding to the edges.
+
+    Parameters:
+        sequences: The protein sequence strings to transform.
+        span (int): The padding to apply left and right of the sequence.
+    
+    Returns:
+        Tensor: The constructed Tensor consisting of the transformed structure matrices.
+    '''
     t_sequences = []
     m = span * 2 + 1
 
@@ -45,7 +57,19 @@ def transform_sequence(sequence: str, span: int) -> Tensor:
     
     return torch.from_numpy(np.array(t_sequences))
 
-def transform_sequences(sequences, span: int):
+def transform_sequences(sequences, span: int) -> Tensor:
+    '''
+    Takes a list of sequence string and transforms it to a Tensor, ready for use in the model.
+    Since protein sequences are of varying length, it chops the string into pieces of (2 * span + 1) length.
+    To make endpoints valid, it applies zero padding to the edges.
+
+    Parameters:
+        sequences: The list of protein sequence strings to transform.
+        span (int): The padding to apply left and right of the sequence.
+    
+    Returns:
+        Tensor: The constructed Tensor consisting of the transformed structure matrices.
+    '''
     t_sequences = []
     m = span * 2 + 1
 
@@ -60,7 +84,17 @@ def transform_sequences(sequences, span: int):
         
     return torch.from_numpy(np.array(t_sequences))
 
-def transform_structures(structures):
+def transform_structures(structures) -> Tensor:
+    '''
+    Takes a list of structure string and transforms it to a Tensor, ready for use in the model.
+    A structure matrix has a size of 3, and one of the elements is 1 corresponding to the matching structure.
+
+    Parameters:
+        structures: The list of structure string to transform.
+    
+    Returns:
+        Tensor: The constructed Tensor consisting of a BATCH_SIZE amount of structure matrices.
+    '''
     t_structures = []
 
     for structure in structures:

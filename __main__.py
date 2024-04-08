@@ -39,13 +39,36 @@ model.load_state_dict(torch.load('model_weights.pth', map_location=torch.device(
 model.eval()
 
 def verify_input_sequence(input_sequence: str) -> bool:
+    '''
+    Verify that the given input sequence consists of valid amino acid codes.
+
+    Parameters:
+        input_sequence (str): A string of amino acid codes
+
+    Returns:
+        bool: True or False
+    '''
     for char in input_sequence:
         if char not in residue_dict:
             return False
     
     return True
 
+def delete_graphic_output() -> None:
+    '''
+    Delete all items in the graphic output window.
+    '''
+    dpg.delete_item("structure_texture")
+    dpg.delete_item("confidence_texture")
+    dpg.delete_item('graphic1')
+    dpg.delete_item('graphic2')
+    dpg.delete_item('graphic3')
+    dpg.delete_item('graphic4')
+
 def analyze_callback() -> None:
+    '''
+    Take the user input, run it through the prediction model, and display the results.
+    '''
     sequence_input: str = dpg.get_value('sequence_input_text')
     sequence_input = sequence_input.upper()
 
@@ -67,12 +90,7 @@ def analyze_callback() -> None:
         dpg.set_value('sequence_output_text', sequence_input)
         dpg.set_value('structure_output_text', structure_output)
 
-        dpg.delete_item("structure_texture")
-        dpg.delete_item("confidence_texture")
-        dpg.delete_item('graphic1')
-        dpg.delete_item('graphic2')
-        dpg.delete_item('graphic3')
-        dpg.delete_item('graphic4')
+        delete_graphic_output()
 
         structure_texture: list = []
         confidence_texture: list = []

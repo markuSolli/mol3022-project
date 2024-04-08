@@ -2,7 +2,22 @@ from torch import nn
 from torch.nn.modules import Module
 
 class NeuralNetwork(Module):
-    def __init__(self, m):
+    """
+    A Neural Network for use in predicting protein secondary structures based on its protein sequence.
+    ...
+
+    Attributes
+    ----------
+    m : int
+        The amount of amino acid codes to account for in the prediction.
+
+    Methods
+    -------
+    classify(x: Tensor):
+        Perform a forward pass using x as input, and apply softmax before returning.
+        Meant for validating or using the model.
+    """
+    def __init__(self, m: int):
         super().__init__()
         self.m = m
         self.flatten = nn.Flatten()

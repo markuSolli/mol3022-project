@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.nn.modules import Module, CrossEntropyLoss
 from torch.optim import Optimizer, SGD
 from torch.optim.lr_scheduler import StepLR
@@ -39,15 +39,32 @@ model: NeuralNetwork = NeuralNetwork(M).to(device)
 test_data = ProteinStructureDataset('data/test.csv', SPAN, device)
 test_dataloader: DataLoader = DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=True)
 
-WEIGHT = torch.tensor([0.522195, 1.477305, 2.450396])
+train_data = ProteinStructureDataset('data/training.csv', SPAN, device)
+train_dataloader: DataLoader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+
+optimizer: SGD = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
+
+WEIGHT: Tensor = torch.tensor([0.522195, 1.477305, 2.450396])
 loss_fn: CrossEntropyLoss = nn.CrossEntropyLoss(weight=WEIGHT)
 
-def train_loop(dataloader: DataLoader, model: NeuralNetwork, loss_fn: Module, optimizer: Optimizer, loss_list: list[float], loss_x: list[int], iteration: int):
-    size = len(dataloader)
+def train_loop(loss_list: list[float], loss_x: list[int], iteration: int) -> int:
+    '''
+    Validates the model using the test_dataloader.
+    Prints the F1 score, and registers it to the given score_list.
+
+    Parameters:
+        score_list (list[float]): The list of F1 scores to plot
+        loss_x: (list[int]): The list of x-values paired to F1 scores.
+        iteration (int): The current iteration value. Will be incremented and returned.
+    
+    Returns:
+        int: the incremented iteration value
+    '''
+    size = len(train_dataloader)
     
     model.train()
 
-    for batch, (sequence, structure) in enumerate(dataloader):
+    for batch, (sequence, structure) in enumerate(train_dataloader):
         pred = model(sequence.view(-1, 20 * model.m))
 
         loss = loss_fn(pred, structure)
@@ -67,7 +84,14 @@ def train_loop(dataloader: DataLoader, model: NeuralNetwork, loss_fn: Module, op
     
     return iteration
 
-def test_loop(dataloader: DataLoader, model: NeuralNetwork, score_list: list[float], score_x: list[int], iteration: int):
+def test_loop(score_list: list[float]) -> None:
+    '''
+    Validates the model using the test_dataloader.
+    Prints the F1 score, and registers it to the given score_list.
+
+    Parameters:
+        score_list (list[float]): The list of F1 scores to plot
+    '''
     model.eval()
     actual = []
     predicted = []
@@ -87,17 +111,20 @@ def test_loop(dataloader: DataLoader, model: NeuralNetwork, score_list: list[flo
     print('F1 score: %.4f\n' % F1_score)
 
     score_list.append(F1_score)
-    score_x.append(iteration)
 
 
-def test_model():
+def test_model() -> None:
+    '''
+    Use data from 'data/test.csv' to evaluate the model.
+    Plots a confusion matrix when completed.
+    '''
     model.eval()
     actual = []
     predicted = []
 
     with torch.no_grad():
         for sequence, structure in test_dataloader:
-            pred = model.classify(sequence.view(-1, 20 * model.m))
+            pred: Tensor = model.classify(sequence.view(-1, 20 * model.m))
 
             actual.extend(structure.argmax(1).tolist())
             predicted.extend(pred.argmax(1).tolist())
@@ -112,26 +139,26 @@ def test_model():
 
     cm_display.plot(ax=ax)
 
-    accuracy = metrics.accuracy_score(actual, predicted)
-    precision = metrics.precision_score(actual, predicted, average='macro')
-    recall = metrics.recall_score(actual, predicted, average='macro')
-    F1_score = metrics.f1_score(actual, predicted, average='macro')
+    accuracy: float = metrics.accuracy_score(actual, predicted)
+    precision: float = metrics.precision_score(actual, predicted, average='macro')
+    recall: float = metrics.recall_score(actual, predicted, average='macro')
+    F1_score: float = metrics.f1_score(actual, predicted, average='macro')
 
-    plot_text = 'Accuracy: %.4f\nPrecision: %.4f\nRecall: %.4f\nF1 score: %.4f'%(accuracy, precision, recall, F1_score)
+    plot_text: str = 'Accuracy: %.4f\nPrecision: %.4f\nRecall: %.4f\nF1 score: %.4f'%(accuracy, precision, recall, F1_score)
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
     ax.text(1.45, 0.95, plot_text, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
     plt.tight_layout()
 
     now = datetime.now()
-    filename = "plots/confusion_matrix_" + now.strftime('%Y%m%d_%H%M') + ".png"
+    filename: str = "plots/confusion_matrix_" + now.strftime('%Y%m%d_%H%M') + ".png"
     plt.savefig(filename)
     plt.show()
 
-def train_model():
-    training_data = ProteinStructureDataset('data/training.csv', SPAN, device)
-    train_dataloader: DataLoader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True)
-
-    optimizer: SGD = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
+def train_model() -> None:
+    '''
+    Use training data to train the neural network.
+    Plots loss and F1 score when completed.
+    '''
     scheduler = StepLR(optimizer, step_size=1, gamma=0.1)
 
     loss_list: list[float] = []
@@ -140,13 +167,15 @@ def train_model():
     score_x: list[int] = []
     i: int = 0
 
-    test_loop(test_dataloader, model, score_list, score_x, 0)
+    test_loop(score_list)
+    score_x.append(0)
 
     for t in range(EPOCHS):
         lr = optimizer.param_groups[0]["lr"]
         print(f"Epoch {t+1}: lr {lr:.6f}\n-------------------------------")
         i = train_loop(train_dataloader, model, loss_fn, optimizer, loss_list, loss_x, i)
-        test_loop(test_dataloader, model, score_list, score_x, i - 1)
+        test_loop(score_list)
+        score_x.append(i)
 
         scheduler.step()
 
@@ -179,7 +208,15 @@ def train_model():
     plt.savefig(filename)
     plt.show()
 
-def main():
+def main() -> None:
+    '''
+    Execute code based on the given command line arguments.
+
+    Arguments:
+        -l: Load model from 'model_weights.pth' and test it using test_model(). 
+            If this is argument is not given, the model will be trained using train_model().
+        -s: Save the model to 'model_weights.pth'
+    '''
     arguments: list[str] = sys.argv[1:]
     load: bool = False
     save: bool = False
