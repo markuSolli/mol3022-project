@@ -9,9 +9,9 @@ class NeuralNetwork(Module):
         self.softmax = nn.Softmax(1)
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(20 * self.m, 10 * self.m),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Linear(10 * self.m, self.m),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Linear(self.m, 3),
         )
 

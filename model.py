@@ -22,7 +22,7 @@ SPAN: int = int(os.getenv('SPAN'))
 BATCH_SIZE: int = int(os.getenv('BATCH_SIZE'))
 M: int = SPAN * 2 + 1
 
-LEARNING_RATE: float = 1e-4
+LEARNING_RATE: float = 1e-1
 EPOCHS: int = 3
 
 device = (
@@ -39,7 +39,7 @@ model: NeuralNetwork = NeuralNetwork(M).to(device)
 test_data = ProteinStructureDataset('data/test.csv', SPAN, device)
 test_dataloader: DataLoader = DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=True)
 
-WEIGHT = torch.tensor([0.508781, 1.548828, 2.571563])
+WEIGHT = torch.tensor([0.522195, 1.477305, 2.450396])
 loss_fn: CrossEntropyLoss = nn.CrossEntropyLoss(weight=WEIGHT)
 
 def train_loop(dataloader: DataLoader, model: NeuralNetwork, loss_fn: Module, optimizer: Optimizer, loss_list: list[float], loss_x: list[int], iteration: int):
@@ -84,7 +84,7 @@ def test_loop(dataloader: DataLoader, model: NeuralNetwork, score_list: list[flo
 
     F1_score = metrics.f1_score(actual, predicted, average='macro')
 
-    print('F1 score: %.3f\n' % F1_score)
+    print('F1 score: %.4f\n' % F1_score)
 
     score_list.append(F1_score)
     score_x.append(iteration)
@@ -108,18 +108,18 @@ def test_model():
 
     cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ['Coil', 'Helix', 'Beta'])
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(8, 4))
 
-    cm_display.plot(colorbar=False, ax=ax)
+    cm_display.plot(ax=ax)
 
     accuracy = metrics.accuracy_score(actual, predicted)
     precision = metrics.precision_score(actual, predicted, average='macro')
     recall = metrics.recall_score(actual, predicted, average='macro')
     F1_score = metrics.f1_score(actual, predicted, average='macro')
 
-    plot_text = 'Accuracy: %.3f\nPrecision: %.3f\nRecall: %.3f\nF1 score: %.3f'%(accuracy, precision, recall, F1_score)
+    plot_text = 'Accuracy: %.4f\nPrecision: %.4f\nRecall: %.4f\nF1 score: %.4f'%(accuracy, precision, recall, F1_score)
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
-    ax.text(1.05, 0.95, plot_text, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
+    ax.text(1.45, 0.95, plot_text, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
     plt.tight_layout()
 
     now = datetime.now()
@@ -169,7 +169,7 @@ def train_model():
     ax2.plot(score_x, score_list, color=color)
     ax2.tick_params(axis='y', labelcolor=color)
 
-    plot_text = 'F1 score: %.3f%%\nLR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20m, 10m)\nLeakyReLu()\nLinear(10m, m)\nLeakyReLu()\nLinear(m, 3)'%(score_list[-1], LEARNING_RATE, lr, SPAN)
+    plot_text = 'F1 score: %.4f\nLR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20m, 10m)\nReLU()\nLinear(10m, m)\nReLU()\nLinear(m, 3)'%(score_list[-1], LEARNING_RATE, lr, SPAN)
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
     ax2.text(1.15, 0.95, plot_text, transform=ax2.transAxes, fontsize=11, verticalalignment='top', bbox=props)
     plt.tight_layout()
