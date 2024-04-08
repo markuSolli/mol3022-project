@@ -11,6 +11,8 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 from datetime import datetime
+import numpy as np
+from sklearn import metrics
 
 from neural_network import NeuralNetwork
 from protein_structure_dataset import ProteinStructureDataset
@@ -37,7 +39,7 @@ model: NeuralNetwork = NeuralNetwork(M).to(device)
 test_data = ProteinStructureDataset('data/test.csv', SPAN, device)
 test_dataloader: DataLoader = DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=True)
 
-WEIGHT = torch.tensor([0.522, 1.477, 2.450])
+WEIGHT = torch.tensor([0.508781, 1.548828, 2.571563])
 loss_fn: CrossEntropyLoss = nn.CrossEntropyLoss(weight=WEIGHT)
 
 def train_loop(dataloader: DataLoader, model: NeuralNetwork, loss_fn: Module, optimizer: Optimizer, loss_list: list[float], loss_x: list[int], iteration: int):
@@ -65,27 +67,65 @@ def train_loop(dataloader: DataLoader, model: NeuralNetwork, loss_fn: Module, op
     
     return iteration
 
-def test_loop(dataloader: DataLoader, model: NeuralNetwork, accuracy_list: list[float], accuracy_x: list[int], iteration: int):
+def test_loop(dataloader: DataLoader, model: NeuralNetwork, score_list: list[float], score_x: list[int], iteration: int):
     model.eval()
-    size = len(dataloader.dataset)
-    correct = 0
+    actual = []
+    predicted = []
 
     with torch.no_grad():
-        for sequence, structure in dataloader:
+        for sequence, structure in test_dataloader:
             pred = model.classify(sequence.view(-1, 20 * model.m))
 
-            correct += (structure.argmax(1) == pred.argmax(1)).type(torch.float).sum().item()
+            actual.extend(structure.argmax(1).tolist())
+            predicted.extend(pred.argmax(1).tolist())
+    
+    actual = np.array(actual)
+    predicted = np.array(predicted)
 
-    correct /= size
-    print(f"Accuracy: {(100*correct):>0.1f}% \n")
+    F1_score = metrics.f1_score(actual, predicted, average='macro')
 
-    accuracy_list.append(100*correct)
-    accuracy_x.append(iteration)
+    print('F1 score: %.3f\n' % F1_score)
+
+    score_list.append(F1_score)
+    score_x.append(iteration)
+
 
 def test_model():
-    test_loop(test_dataloader, model, [], [], 0)
+    model.eval()
+    actual = []
+    predicted = []
 
-    print("Testing done!")
+    with torch.no_grad():
+        for sequence, structure in test_dataloader:
+            pred = model.classify(sequence.view(-1, 20 * model.m))
+
+            actual.extend(structure.argmax(1).tolist())
+            predicted.extend(pred.argmax(1).tolist())
+    
+    actual = np.array(actual)
+    predicted = np.array(predicted)
+    confusion_matrix = metrics.confusion_matrix(actual, predicted) 
+
+    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ['Coil', 'Helix', 'Beta'])
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    cm_display.plot(colorbar=False, ax=ax)
+
+    accuracy = metrics.accuracy_score(actual, predicted)
+    precision = metrics.precision_score(actual, predicted, average='macro')
+    recall = metrics.recall_score(actual, predicted, average='macro')
+    F1_score = metrics.f1_score(actual, predicted, average='macro')
+
+    plot_text = 'Accuracy: %.3f\nPrecision: %.3f\nRecall: %.3f\nF1 score: %.3f'%(accuracy, precision, recall, F1_score)
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
+    ax.text(1.05, 0.95, plot_text, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
+    plt.tight_layout()
+
+    now = datetime.now()
+    filename = "plots/confusion_matrix_" + now.strftime('%Y%m%d_%H%M') + ".png"
+    plt.savefig(filename)
+    plt.show()
 
 def train_model():
     training_data = ProteinStructureDataset('data/training.csv', SPAN, device)
@@ -96,17 +136,17 @@ def train_model():
 
     loss_list: list[float] = []
     loss_x: list[int] = []
-    accuracy_list: list[float] = []
-    accuracy_x: list[int] = []
+    score_list: list[float] = []
+    score_x: list[int] = []
     i: int = 0
 
-    test_loop(test_dataloader, model, accuracy_list, accuracy_x, 0)
+    test_loop(test_dataloader, model, score_list, score_x, 0)
 
     for t in range(EPOCHS):
         lr = optimizer.param_groups[0]["lr"]
         print(f"Epoch {t+1}: lr {lr:.6f}\n-------------------------------")
         i = train_loop(train_dataloader, model, loss_fn, optimizer, loss_list, loss_x, i)
-        test_loop(test_dataloader, model, accuracy_list, accuracy_x, i - 1)
+        test_loop(test_dataloader, model, score_list, score_x, i - 1)
 
         scheduler.step()
 
@@ -124,12 +164,12 @@ def train_model():
     ax2 = ax1.twinx()
 
     color = 'tab:red'
-    ax2.set_ylabel('accuracy (%)', color=color)
-    ax2.set_ylim([0, 100])
-    ax2.plot(accuracy_x, accuracy_list, color=color)
+    ax2.set_ylabel('F1 score', color=color)
+    ax2.set_ylim([0.0, 1.0])
+    ax2.plot(score_x, score_list, color=color)
     ax2.tick_params(axis='y', labelcolor=color)
 
-    plot_text = 'Accuracy: %.1f%%\nLR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20m, 10m)\nLeakyReLu()\nLinear(10m, m)\nLeakyReLu()\nLinear(m, 3)'%(accuracy_list[-1], LEARNING_RATE, lr, SPAN)
+    plot_text = 'F1 score: %.3f%%\nLR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20m, 10m)\nLeakyReLu()\nLinear(10m, m)\nLeakyReLu()\nLinear(m, 3)'%(score_list[-1], LEARNING_RATE, lr, SPAN)
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
     ax2.text(1.15, 0.95, plot_text, transform=ax2.transAxes, fontsize=11, verticalalignment='top', bbox=props)
     plt.tight_layout()
