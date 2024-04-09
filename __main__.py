@@ -147,7 +147,7 @@ with dpg.window() as primary_window:
         dpg.add_text('', tag='sequence_output_text')
         dpg.add_text('', tag='structure_output_text')
 
-    with dpg.window(label='Graphic output',
+    with dpg.window(label='Graphical output',
                     tag='graphic_output_window',
                     pos=(0, 230),
                     width=WINDOW_WIDTH,

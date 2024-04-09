@@ -1,6 +1,12 @@
 '''Module for functions relating to the Uniprot API'''
+import os
 import pandas as pd
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+TRAINING_N: int = int(os.getenv('TRAINING_N'))
+TEST_N: int = int(os.getenv('TEST_N'))
 
 def transform_entry(entry: dict) -> tuple[str, str]:
     '''
@@ -86,8 +92,8 @@ def get_uniprot_data() -> None:
                 "&query=%28*%29+AND+%28reviewed%3Atrue%29+AND+%28proteins_with%3A1%29"
                 "&size=500&sort=id+asc")
 
-    url = collect_to_file(url, 8, 'data/training.csv')
-    url = collect_to_file(url, 2, 'data/test.csv')
+    url = collect_to_file(url, TRAINING_N, 'data/training.csv')
+    url = collect_to_file(url, TEST_N, 'data/test.csv')
 
 if __name__ == "__main__":
     get_uniprot_data()

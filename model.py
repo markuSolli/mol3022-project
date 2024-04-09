@@ -45,7 +45,9 @@ train_dataloader: DataLoader = DataLoader(train_data, batch_size=BATCH_SIZE, shu
 
 optimizer: SGD = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
-WEIGHT: Tensor = torch.tensor([0.522195, 1.477305, 2.450396])
+WEIGHT: Tensor = torch.tensor([float(os.getenv('WEIGHT_C')),
+                               float(os.getenv('WEIGHT_H')),
+                               float(os.getenv('WEIGHT_B'))])
 loss_fn: CrossEntropyLoss = nn.CrossEntropyLoss(weight=WEIGHT)
 
 def train_loop(loss_list: list[float], loss_x: list[int], iteration: int) -> int:
