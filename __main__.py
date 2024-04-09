@@ -1,3 +1,4 @@
+'''Launches a graphical interface to use the AI model for predicting protein secondary structure'''
 from math import floor
 import os
 from dotenv import load_dotenv
@@ -6,7 +7,6 @@ import torch
 from torch import Tensor
 
 import dearpygui.dearpygui as dpg
-import numpy as np
 
 from neural_network import NeuralNetwork
 from utils import transform_sequence, residue_dict, structure_dict
@@ -30,12 +30,14 @@ structure_color: dict = {
 }
 
 dpg.create_context()
-dpg.create_viewport(width=WINDOW_WIDTH, height=WINDOW_HEIGT, title='Protein secondary structure prediction tool')
+dpg.create_viewport(width=WINDOW_WIDTH,
+                    height=WINDOW_HEIGT,
+                    title='Protein secondary structure prediction tool')
 dpg.setup_dearpygui()
 
-device = "cpu"
-model: NeuralNetwork = NeuralNetwork(M).to(device)
-model.load_state_dict(torch.load('model_weights.pth', map_location=torch.device(device)))
+DEVICE: str = "cpu"
+model: NeuralNetwork = NeuralNetwork(M).to(DEVICE)
+model.load_state_dict(torch.load('model_weights.pth', map_location=torch.device(DEVICE)))
 model.eval()
 
 def verify_input_sequence(input_sequence: str) -> bool:
@@ -51,7 +53,7 @@ def verify_input_sequence(input_sequence: str) -> bool:
     for char in input_sequence:
         if char not in residue_dict:
             return False
-    
+
     return True
 
 def delete_graphic_output() -> None:
@@ -72,12 +74,12 @@ def analyze_callback() -> None:
     sequence_input: str = dpg.get_value('sequence_input_text')
     sequence_input = sequence_input.upper()
 
-    if not (verify_input_sequence(sequence_input)):
+    if not verify_input_sequence(sequence_input):
         dpg.set_value('sequence_input_error', 'Invalid input sequence')
         return
     else:
         dpg.set_value('sequence_input_error', '')
-    
+
     sequence_tensor: Tensor = transform_sequence(sequence_input, SPAN)
 
     with torch.no_grad():
@@ -86,7 +88,7 @@ def analyze_callback() -> None:
         structure_output: str = ''
         for index in pred.argmax(1):
             structure_output += structure_key_list[structure_val_list.index(index)]
-        
+
         dpg.set_value('sequence_output_text', sequence_input)
         dpg.set_value('structure_output_text', structure_output)
 
@@ -95,7 +97,7 @@ def analyze_callback() -> None:
         structure_texture: list = []
         confidence_texture: list = []
 
-        for i in range(GRAPHIC_HEIGHT):
+        for _i in range(GRAPHIC_HEIGHT):
             for j in range(GRAPHIC_WIDTH):
                 x: int = floor((j / GRAPHIC_WIDTH) * len(sequence_input))
                 c: tuple = structure_color[structure_output[x]]
@@ -113,10 +115,16 @@ def analyze_callback() -> None:
                 confidence_texture.append(1.0)
 
         with dpg.texture_registry():
-            dpg.add_static_texture(width=GRAPHIC_WIDTH, height=GRAPHIC_HEIGHT, default_value=structure_texture, tag="structure_texture")
-        
+            dpg.add_static_texture(width=GRAPHIC_WIDTH,
+                                   height=GRAPHIC_HEIGHT,
+                                   default_value=structure_texture,
+                                   tag="structure_texture")
+
         with dpg.texture_registry():
-            dpg.add_static_texture(width=GRAPHIC_WIDTH, height=GRAPHIC_HEIGHT, default_value=confidence_texture, tag="confidence_texture")
+            dpg.add_static_texture(width=GRAPHIC_WIDTH,
+                                   height=GRAPHIC_HEIGHT,
+                                   default_value=confidence_texture,
+                                   tag="confidence_texture")
 
         dpg.add_text('Structure', tag='graphic1', parent='graphic_output_window')
         dpg.add_image("structure_texture", tag='graphic2', parent='graphic_output_window')
@@ -131,11 +139,19 @@ with dpg.window() as primary_window:
         dpg.add_button(label='Analyze sequence', callback=analyze_callback)
         dpg.add_text('', tag='sequence_input_error', color=(255, 32, 32, 255))
 
-    with dpg.window(label='Text output', pos=(0, 130), width=WINDOW_WIDTH, height=100, horizontal_scrollbar=True):
+    with dpg.window(label='Text output',
+                    pos=(0, 130),
+                    width=WINDOW_WIDTH,
+                    height=100,
+                    horizontal_scrollbar=True):
         dpg.add_text('', tag='sequence_output_text')
         dpg.add_text('', tag='structure_output_text')
 
-    with dpg.window(label='Graphic output', tag='graphic_output_window', pos=(0, 230), width=WINDOW_WIDTH, height=170):
+    with dpg.window(label='Graphic output',
+                    tag='graphic_output_window',
+                    pos=(0, 230),
+                    width=WINDOW_WIDTH,
+                    height=170):
         pass
 
 dpg.set_primary_window(primary_window, True)

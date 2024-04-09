@@ -1,16 +1,17 @@
+'''Module for functions related to training and validation of the neural network'''
 import sys
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 import torch
 from torch import Tensor, nn
-from torch.nn.modules import Module, CrossEntropyLoss
-from torch.optim import Optimizer, SGD
+from torch.nn.modules import CrossEntropyLoss
+from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
-from datetime import datetime
 import numpy as np
 from sklearn import metrics
 
@@ -25,21 +26,21 @@ M: int = SPAN * 2 + 1
 LEARNING_RATE: float = 1e-1
 EPOCHS: int = 3
 
-device = (
+DEVICE: str = (
     "cuda"
     if torch.cuda.is_available()
     else "mps"
     if torch.backends.mps.is_available()
     else "cpu"
 )
-print(f"Using {device} device")
+print(f'Using {DEVICE} device')
 
-model: NeuralNetwork = NeuralNetwork(M).to(device)
+model: NeuralNetwork = NeuralNetwork(M).to(DEVICE)
 
-test_data = ProteinStructureDataset('data/test.csv', SPAN, device)
+test_data = ProteinStructureDataset('data/test.csv', SPAN, DEVICE)
 test_dataloader: DataLoader = DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=True)
 
-train_data = ProteinStructureDataset('data/training.csv', SPAN, device)
+train_data = ProteinStructureDataset('data/training.csv', SPAN, DEVICE)
 train_dataloader: DataLoader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
 
 optimizer: SGD = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
@@ -61,18 +62,18 @@ def train_loop(loss_list: list[float], loss_x: list[int], iteration: int) -> int
         int: the incremented iteration value
     '''
     size = len(train_dataloader)
-    
+
     model.train()
 
     for batch, (sequence, structure) in enumerate(train_dataloader):
-        pred = model(sequence.view(-1, 20 * model.m))
+        pred = model.forward(sequence.view(-1, 20 * model.m))
 
         loss = loss_fn(pred, structure)
         loss.backward()
 
         optimizer.step()
         optimizer.zero_grad()
-        
+
         if batch % 40 == 0:
             loss_list.append(loss.item())
             loss_x.append(iteration)
@@ -81,7 +82,7 @@ def train_loop(loss_list: list[float], loss_x: list[int], iteration: int) -> int
         if batch % 5000 == 0:
             loss = loss.item()
             print(f"loss: {loss:>7f}  [{batch:>5d}/{size:>5d}]")
-    
+
     return iteration
 
 def test_loop(score_list: list[float]) -> None:
@@ -102,16 +103,55 @@ def test_loop(score_list: list[float]) -> None:
 
             actual.extend(structure.argmax(1).tolist())
             predicted.extend(pred.argmax(1).tolist())
-    
+
     actual = np.array(actual)
     predicted = np.array(predicted)
 
-    F1_score = metrics.f1_score(actual, predicted, average='macro')
+    f1_score = metrics.f1_score(actual, predicted, average='macro')
 
-    print('F1 score: %.4f\n' % F1_score)
+    print(f'F1 score: {f1_score:.4f}\n')
 
-    score_list.append(F1_score)
+    score_list.append(f1_score)
 
+def plot_confusion_matrix(actual: list, predicted: list) -> None:
+    '''
+    Use sklearn to create a confusion matrix based on the given actual and predicted values.
+    Plot the matrix alongside statistical measures.
+
+    Parameters:
+        actual (list): List of actual classes (0, 1, or 2)
+        predicted (list): List of predicted classes, in same order as the actual list.
+    '''
+    confusion_matrix = metrics.confusion_matrix(actual, predicted)
+
+    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix,
+                                                display_labels = ['Coil', 'Helix', 'Beta'])
+
+    _fig, ax = plt.subplots(figsize=(8, 4))
+
+    cm_display.plot(ax=ax)
+
+    accuracy: float = metrics.accuracy_score(actual, predicted)
+    precision: float = metrics.precision_score(actual, predicted, average='macro')
+    recall: float = metrics.recall_score(actual, predicted, average='macro')
+    f1_score: float = metrics.f1_score(actual, predicted, average='macro')
+
+    plot_text: str = (f'Accuracy: {accuracy:.4f}\n'
+                      f'Precision: {precision:.4f}\n'
+                      f'Recall: {recall:.4f}\n'
+                      f'F1 score: {f1_score:.4f}')
+    props = {'boxstyle':'round', 'facecolor':'wheat', 'alpha':0.15}
+    ax.text(1.45, 0.95, plot_text,
+            transform=ax.transAxes,
+            fontsize=11,
+            verticalalignment='top',
+            bbox=props)
+    plt.tight_layout()
+
+    now = datetime.now()
+    filename: str = "plots/confusion_matrix_" + now.strftime('%Y%m%d_%H%M') + ".png"
+    plt.savefig(filename)
+    plt.show()
 
 def test_model() -> None:
     '''
@@ -128,29 +168,59 @@ def test_model() -> None:
 
             actual.extend(structure.argmax(1).tolist())
             predicted.extend(pred.argmax(1).tolist())
-    
+
     actual = np.array(actual)
     predicted = np.array(predicted)
-    confusion_matrix = metrics.confusion_matrix(actual, predicted) 
+    plot_confusion_matrix(actual, predicted)
 
-    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ['Coil', 'Helix', 'Beta'])
+def plot_training_loss(lr: float,
+                       loss_list: list,
+                       loss_x: list,
+                       score_list: list,
+                       score_x: list) -> None:
+    '''
+    Plot training loss along the same axis as the F1 score for each epoch.
 
-    fig, ax = plt.subplots(figsize=(8, 4))
+    Parameters:
+        lr (float): The final learning rate after training.
+        loss_list (list): List of loss values to plot.
+        loss_x (list): List of x values corresponding to the loss values.
+        score_list (list): List of F1 scores to plot.
+        score_x (list): List of x values corresponding to the F1 scores.
+    '''
+    _fig, ax1 = plt.subplots(figsize=(9, 4))
 
-    cm_display.plot(ax=ax)
+    color = 'tab:blue'
+    ax1.set_xlabel('iteration')
+    ax1.set_ylabel('loss', color=color)
+    ax1.set_ylim([0, 1.6])
+    ax1.plot(loss_x, loss_list, '.', color=color, alpha=0.3)
+    ax1.tick_params(axis='y', labelcolor=color)
 
-    accuracy: float = metrics.accuracy_score(actual, predicted)
-    precision: float = metrics.precision_score(actual, predicted, average='macro')
-    recall: float = metrics.recall_score(actual, predicted, average='macro')
-    F1_score: float = metrics.f1_score(actual, predicted, average='macro')
+    ax2 = ax1.twinx()
 
-    plot_text: str = 'Accuracy: %.4f\nPrecision: %.4f\nRecall: %.4f\nF1 score: %.4f'%(accuracy, precision, recall, F1_score)
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
-    ax.text(1.45, 0.95, plot_text, transform=ax.transAxes, fontsize=11, verticalalignment='top', bbox=props)
+    color = 'tab:red'
+    ax2.set_ylabel('F1 score', color=color)
+    ax2.set_ylim([0.0, 1.0])
+    ax2.plot(score_x, score_list, color=color)
+    ax2.tick_params(axis='y', labelcolor=color)
+
+    plot_text = (f'F1 score: {score_list[-1]:.4f}\n'
+                 f'LR: {LEARNING_RATE:.1e} - {lr:.1e}\n'
+                 f'Span: {SPAN:d}\n'
+                 'Optimizer: SGD\n'
+                 'Loss: CrossEntropyLoss\n'
+                 'Model:\nLinear(20m, 10m)\nReLU()\nLinear(10m, m)\nReLU()\nLinear(m, 3)')
+    props = {'boxstyle':'round', 'facecolor':'wheat', 'alpha':0.15}
+    ax2.text(1.15, 0.95, plot_text,
+             transform=ax2.transAxes,
+             fontsize=11,
+             verticalalignment='top',
+             bbox=props)
     plt.tight_layout()
 
     now = datetime.now()
-    filename: str = "plots/confusion_matrix_" + now.strftime('%Y%m%d_%H%M') + ".png"
+    filename = "plots/plot_" + now.strftime('%Y%m%d_%H%M') + ".png"
     plt.savefig(filename)
     plt.show()
 
@@ -172,8 +242,8 @@ def train_model() -> None:
 
     for t in range(EPOCHS):
         lr = optimizer.param_groups[0]["lr"]
-        print(f"Epoch {t+1}: lr {lr:.6f}\n-------------------------------")
-        i = train_loop(train_dataloader, model, loss_fn, optimizer, loss_list, loss_x, i)
+        print(f'Epoch {t+1}: lr {lr:.6f}\n-------------------------------')
+        i = train_loop(loss_list, loss_x, i)
         test_loop(score_list)
         score_x.append(i)
 
@@ -181,32 +251,7 @@ def train_model() -> None:
 
     print("Training done!")
 
-    fig, ax1 = plt.subplots(figsize=(9, 4))
-
-    color = 'tab:blue'
-    ax1.set_xlabel('iteration')
-    ax1.set_ylabel('loss', color=color)
-    ax1.set_ylim([0, 1.6])
-    ax1.plot(loss_x, loss_list, '.', color=color, alpha=0.3)
-    ax1.tick_params(axis='y', labelcolor=color)
-
-    ax2 = ax1.twinx()
-
-    color = 'tab:red'
-    ax2.set_ylabel('F1 score', color=color)
-    ax2.set_ylim([0.0, 1.0])
-    ax2.plot(score_x, score_list, color=color)
-    ax2.tick_params(axis='y', labelcolor=color)
-
-    plot_text = 'F1 score: %.4f\nLR: %.1e - %.1e\nSpan: %d\nOptimizer: SGD\nLoss: CrossEntropyLoss\nModel:\nLinear(20m, 10m)\nReLU()\nLinear(10m, m)\nReLU()\nLinear(m, 3)'%(score_list[-1], LEARNING_RATE, lr, SPAN)
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.15)
-    ax2.text(1.15, 0.95, plot_text, transform=ax2.transAxes, fontsize=11, verticalalignment='top', bbox=props)
-    plt.tight_layout()
-
-    now = datetime.now()
-    filename = "plots/plot_" + now.strftime('%Y%m%d_%H%M') + ".png"
-    plt.savefig(filename)
-    plt.show()
+    plot_training_loss(lr, loss_list, loss_x, score_list, score_x)
 
 def main() -> None:
     '''
@@ -225,17 +270,17 @@ def main() -> None:
         match argument:
             case '-l': load = True
             case '-s': save = True
-    
+
     if load:
         model.load_state_dict(torch.load('model_weights.pth'))
         test_model()
     else:
         train_model()
-    
+
     if save:
         torch.save(model.state_dict(), 'model_weights.pth')
 
-    exit(0)
+    sys.exit(0)
 
 if __name__== "__main__":
     main()
