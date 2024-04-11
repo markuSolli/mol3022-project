@@ -115,45 +115,23 @@ def test_loop(score_list: list[float]) -> None:
 
     score_list.append(f1_score)
 
-def plot_confusion_matrix(actual: list, predicted: list) -> None:
+def evaluate_results(actual: list, predicted: list) -> None:
     '''
-    Use sklearn to create a confusion matrix based on the given actual and predicted values.
-    Plot the matrix alongside statistical measures.
+    Use sklearn to evaluate the model with different accuracy measures.
 
     Parameters:
         actual (list): List of actual classes (0, 1, or 2)
         predicted (list): List of predicted classes, in same order as the actual list.
     '''
-    confusion_matrix = metrics.confusion_matrix(actual, predicted)
-
-    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix,
-                                                display_labels = ['Coil', 'Helix', 'Beta'])
-
-    _fig, ax = plt.subplots(figsize=(8, 4))
-
-    cm_display.plot(ax=ax)
-
     accuracy: float = metrics.accuracy_score(actual, predicted)
-    precision: float = metrics.precision_score(actual, predicted, average='macro')
-    recall: float = metrics.recall_score(actual, predicted, average='macro')
-    f1_score: float = metrics.f1_score(actual, predicted, average='macro')
+    precision: np.ndarray = metrics.precision_score(actual, predicted, average=None)
+    recall: np.ndarray = metrics.recall_score(actual, predicted, average=None)
+    f1_score: np.ndarray = metrics.f1_score(actual, predicted, average=None)
 
-    plot_text: str = (f'Accuracy: {accuracy:.4f}\n'
-                      f'Precision: {precision:.4f}\n'
-                      f'Recall: {recall:.4f}\n'
-                      f'F1 score: {f1_score:.4f}')
-    props = {'boxstyle':'round', 'facecolor':'wheat', 'alpha':0.15}
-    ax.text(1.45, 0.95, plot_text,
-            transform=ax.transAxes,
-            fontsize=11,
-            verticalalignment='top',
-            bbox=props)
-    plt.tight_layout()
-
-    now = datetime.now()
-    filename: str = "plots/confusion_matrix_" + now.strftime('%Y%m%d_%H%M') + ".png"
-    plt.savefig(filename)
-    plt.show()
+    print(f'Accuracy: {accuracy:.4f}\n'
+          f'Precision: {precision[0]:.4f}, {precision[1]:.4f}, {precision[2]:.4f}\n'
+          f'Recall: {recall[0]:.4f}, {recall[1]:.4f}, {recall[2]:.4f}\n'
+          f'F1 score: {f1_score[0]:.4f}, {f1_score[1]:.4f}, {f1_score[2]:.4f}')
 
 def test_model() -> None:
     '''
@@ -173,7 +151,7 @@ def test_model() -> None:
 
     actual = np.array(actual)
     predicted = np.array(predicted)
-    plot_confusion_matrix(actual, predicted)
+    evaluate_results(actual, predicted)
 
 def plot_training_loss(lr: float,
                        loss_list: list,
